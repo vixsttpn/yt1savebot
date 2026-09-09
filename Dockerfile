@@ -3,5 +3,5 @@ RUN apt-get update && apt-get install -y ffmpeg curl unzip && curl -fsSL https:/
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
-COPY. .
+COPY . /app
 CMD ["python", "bot.py"]
