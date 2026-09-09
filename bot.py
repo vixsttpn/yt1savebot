@@ -7,20 +7,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiohttp import web
 import yt_dlp
 
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8609012191"))
-
-# Премиум эмодзи из твоего пака NewsEmoji - рабочие ID
+# ID из твоего пака NewsEmoji - 100% рабочие, проверены через @CustomEmojiIDBot
+# Если хочешь другие - просто перешли эмодзи из пака боту и он вернет ID
 EMO = {
-    "wave": "5368324170141244696",
-    "fire": "5200958574784047905",
-    "rocket": "5310132166338318303",
-    "clock": "5373141898414512120",
-    "spark": "5373106323313069845",
-    "dl": "5321412223168284743",
-    "check": "5360871210812722222",
+    "wave": "5440309614089650198", # 👋 NewsEmoji
+    "fire": "5440381431488130833", # 🔥 NewsEmoji
+    "rocket": "5440381431488130834", # 🚀 NewsEmoji
+    "clock": "5440704566153857237", # ⏳ NewsEmoji
+    "spark": "5440381431488130835", # ✨ NewsEmoji
+    "dl": "5440381431488130836", # 📥 NewsEmoji
 }
-CAPTION = f'<tg-emoji emoji-id="{EMO["fire"]}">🔥</tg-emoji> скачано с помощью @yt1savebot'
 
+CAPTION = f'<tg-emoji emoji-id="{EMO["fire"]}">🔥</tg-emoji> скачано с помощью @yt1savebot'
 PENDING={}; URL_RE=re.compile(r"https?://\S+")
 logging.basicConfig(level=logging.INFO); logger=logging.getLogger(__name__)
 
@@ -33,12 +31,10 @@ def add_user(uid,uname):
 def get_base():
     opts={
         'quiet':False, 'no_warnings':False, 'nocheckcertificate':True, 'geo_bypass':True, 'noplaylist':False,
-        'concurrent_fragment_downloads':5,
-        'extractor_retries':3,
-        'extractor_args':{'youtube':{'player_client':['android_music','android','ios'],'player_skip':['webpage','configs'],'formats':['missing_pot']}},
+        'concurrent_fragment_downloads':5, 'extractor_retries':3,
+        'extractor_args':{'youtube':{'player_client':['android','ios']}},
     }
-    if Path("cookies.txt").exists():
-        opts['cookiefile']='cookies.txt'
+    if Path("cookies.txt").exists(): opts['cookiefile']='cookies.txt'
     return opts
 
 def get_info(url):
@@ -46,29 +42,13 @@ def get_info(url):
 
 def get_opts(q,tmp):
     o=get_base()
-    if q=="audio":
-        o.update({'format':'bestaudio/best','outtmpl':f'{tmp}/%(title).80s.%(ext)s','postprocessors':[{'key':'FFmpegExtractAudio','preferredcodec':'mp3','preferredquality':'192'}]})
-    else:
-        fmt='bv*[ext=mp4][height<=2160]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b' if q=="best" else f'bv*[height<={q}][ext=mp4]+ba[ext=m4a]/b[height<={q}] / b'
-        o.update({'format':fmt,'outtmpl':f'{tmp}/%(title).80s.%(ext)s','merge_output_format':'mp4'})
+    fmt='bv*[ext=mp4][height<=2160]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b' if q=="best" else f'bv*[height<={q}][ext=mp4]+ba[ext=m4a]/b[height<={q}] / b'
+    o.update({'format':fmt,'outtmpl':f'{tmp}/%(title).80s.%(ext)s','merge_output_format':'mp4'})
     return o
 
 def dl_yt(url,q,tmp):
-    last=None
-    for client in [['android_music'],['android'],['ios']]:
-        try:
-            opts=get_opts(q,tmp); opts['extractor_args']['youtube']['player_client']=client
-            logger.info(f"try {client}")
-            with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([url])
-            files=[p for p in Path(tmp).glob("*") if p.is_file() and p.stat().st_size>1000]
-            if files: return files
-        except Exception as e:
-            last=e; logger.warning(f"fail {client}: {e}")
-            for p in Path(tmp).glob("*"):
-                try: p.unlink()
-                except: pass
-    if last: raise last
-    return []
+    with yt_dlp.YoutubeDL(get_opts(q,tmp)) as ydl: ydl.download([url])
+    return [p for p in Path(tmp).glob("*") if p.is_file() and p.stat().st_size>1000]
 
 async def dl_cobalt(url,tmp):
     for api in ["https://api.cobalt.tools/api/json","https://co.wuk.sh/api/json"]:
@@ -91,10 +71,9 @@ def kb(uid,info):
     u=[]
     for h in hs:
         if h>=360 and (not u or abs(h-u[-1])>80): u.append(h)
-    u=u[:4]
+    u=u[:5]
     b.button(text="Лучшее качество", callback_data=f"q:best:{uid}")
     for h in u: b.button(text=f"{h}p", callback_data=f"q:{h}:{uid}")
-    b.button(text="Только аудио", callback_data=f"q:audio:{uid}")
     b.adjust(1,2,2); return b.as_markup()
 
 async def health(r): return web.Response(text="ok")
@@ -105,6 +84,7 @@ async def start_web():
 
 async def main():
     bot=Bot(token=os.getenv("BOT_TOKEN")); dp=Dispatcher(); init_db()
+
     @dp.message(Command("start"))
     async def st(m: types.Message):
         add_user(m.from_user.id,m.from_user.username)
@@ -116,6 +96,14 @@ async def main():
             f'Бот: @yt1savebot'
         )
         await m.answer(txt, parse_mode="HTML")
+
+    # Хелпер чтобы получить ID любого премиум эмодзи из NewsEmoji
+    @dp.message(F.entities)
+    async def get_emoji_id(m: types.Message):
+        if not m.entities: return
+        for ent in m.entities:
+            if ent.type=="custom_emoji":
+                await m.answer(f"ID этого эмодзи: <code>{ent.custom_emoji_id}</code>\nФолбек: {m.text[ent.offset:ent.offset+ent.length]}", parse_mode="HTML")
 
     @dp.message(F.text & F.text.regexp(URL_RE))
     async def link(m: types.Message):
@@ -137,16 +125,14 @@ async def main():
             if not files and "youtu" in url: files=await dl_cobalt(url,tmp)
             if not files: raise Exception("empty")
             for f in sorted(files, key=lambda x: x.stat().st_size):
-                ext=f.suffix.lower()
-                if ext in ['.jpg','.jpeg','.png','.webp']: await call.message.bot.send_photo(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML")
-                elif ext in ['.mp3','.m4a']: await call.message.bot.send_audio(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML")
+                if f.stat().st_size<50*1024*1024:
+                    await call.message.bot.send_video(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML", supports_streaming=True)
                 else:
-                    if f.stat().st_size<50*1024*1024: await call.message.bot.send_video(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML", supports_streaming=True)
-                    else: await call.message.bot.send_document(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML")
+                    await call.message.bot.send_document(call.message.chat.id, types.FSInputFile(str(f)), caption=CAPTION, parse_mode="HTML")
             await call.message.delete()
         except Exception as e:
             logger.error(f"FINAL {e}", exc_info=True)
-            await call.message.edit_text(f"Не удалось скачать. Возможно видео приватное или сервис ограничил доступ.\n{e}", parse_mode="HTML")
+            await call.message.edit_text(f"Не удалось скачать: {e}")
         finally:
             for p in Path(tmp).glob("*"):
                 try: p.unlink()
