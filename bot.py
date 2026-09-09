@@ -7,17 +7,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiohttp import web
 import yt_dlp
 
-# ID из твоего пака NewsEmoji - 100% рабочие, проверены через @CustomEmojiIDBot
-# Если хочешь другие - просто перешли эмодзи из пака боту и он вернет ID
 EMO = {
-    "wave": "5440309614089650198", # 👋 NewsEmoji
-    "fire": "5440381431488130833", # 🔥 NewsEmoji
-    "rocket": "5440381431488130834", # 🚀 NewsEmoji
-    "clock": "5440704566153857237", # ⏳ NewsEmoji
-    "spark": "5440381431488130835", # ✨ NewsEmoji
-    "dl": "5440381431488130836", # 📥 NewsEmoji
+    "wave": "5440309614089650198",
+    "fire": "5440381431488130833",
+    "rocket": "5440381431488130834",
+    "clock": "5440704566153857237",
+    "spark": "5440381431488130835",
+    "dl": "5440381431488130836",
 }
-
 CAPTION = f'<tg-emoji emoji-id="{EMO["fire"]}">🔥</tg-emoji> скачано с помощью @yt1savebot'
 PENDING={}; URL_RE=re.compile(r"https?://\S+")
 logging.basicConfig(level=logging.INFO); logger=logging.getLogger(__name__)
@@ -29,11 +26,7 @@ def add_user(uid,uname):
     except: pass
 
 def get_base():
-    opts={
-        'quiet':False, 'no_warnings':False, 'nocheckcertificate':True, 'geo_bypass':True, 'noplaylist':False,
-        'concurrent_fragment_downloads':5, 'extractor_retries':3,
-        'extractor_args':{'youtube':{'player_client':['android','ios']}},
-    }
+    opts={'quiet':False,'no_warnings':False,'nocheckcertificate':True,'geo_bypass':True,'noplaylist':False,'concurrent_fragment_downloads':5,'extractor_retries':3,'extractor_args':{'youtube':{'player_client':['android','ios']}}}
     if Path("cookies.txt").exists(): opts['cookiefile']='cookies.txt'
     return opts
 
@@ -92,18 +85,9 @@ async def main():
             f'<tg-emoji emoji-id="{EMO["wave"]}">👋</tg-emoji> Здравствуйте.\n\n'
             f'Отправьте любую ссылку на видео, фото, пост, сторис, рилс.\n\n'
             f'<tg-emoji emoji-id="{EMO["rocket"]}">🚀</tg-emoji> Поддерживаю 1800+ сайтов: TikTok, Instagram, YouTube, Twitter, Facebook, Reddit, Pinterest, Twitch и другие.\n\n'
-            f'Автор: @vvpse\n'
-            f'Бот: @yt1savebot'
+            f'Автор: @vvpse\nБот: @yt1savebot'
         )
         await m.answer(txt, parse_mode="HTML")
-
-    # Хелпер чтобы получить ID любого премиум эмодзи из NewsEmoji
-    @dp.message(F.entities)
-    async def get_emoji_id(m: types.Message):
-        if not m.entities: return
-        for ent in m.entities:
-            if ent.type=="custom_emoji":
-                await m.answer(f"ID этого эмодзи: <code>{ent.custom_emoji_id}</code>\nФолбек: {m.text[ent.offset:ent.offset+ent.length]}", parse_mode="HTML")
 
     @dp.message(F.text & F.text.regexp(URL_RE))
     async def link(m: types.Message):
@@ -113,6 +97,13 @@ async def main():
         except Exception as e: logger.error(f"info {e}"); info={'title':'медиа','formats':[{'height':1080},{'height':720},{'height':480}]}
         uid=uuid.uuid4().hex[:8]; PENDING[uid]=url
         await wait.edit_text(f'<tg-emoji emoji-id="{EMO["spark"]}">✨</tg-emoji> Найдено: {info.get("title","медиа")[:70]}\n\nВыберите качество:', reply_markup=kb(uid,info), parse_mode="HTML")
+
+    # Этот хендлер только для премиум эмодзи, ссылки он не трогает
+    @dp.message(lambda m: m.entities and any(e.type=="custom_emoji" for e in m.entities))
+    async def get_emoji_id(m: types.Message):
+        for ent in m.entities:
+            if ent.type=="custom_emoji":
+                await m.answer(f"ID: <code>{ent.custom_emoji_id}</code>", parse_mode="HTML")
 
     @dp.callback_query(F.data.startswith("q:"))
     async def cq(call: types.CallbackQuery):
